@@ -24,6 +24,8 @@ class AppTheme {
           /// Label Medium [TextStyle] of Light Theme
           labelMedium: TextStyle(
               color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600),
+          labelSmall: TextStyle(
+              color: Colors.black, fontSize: 12, fontWeight: FontWeight.w600),
         ),
 
         /// Primary Swatch of Light Theme
@@ -71,6 +73,14 @@ class AppTheme {
           iconColor: Colors.black,
           labelStyle: TextStyle(color: Colors.black),
         ),
+
+        /// Card Theme for Light Theme
+        cardTheme: CardTheme(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          color: Colors.indigo.shade50,
+        ),
+        dividerColor: Colors.black87,
       );
 
   /// This method return [ThemeData] of Dark Theme
@@ -110,7 +120,11 @@ class AppTheme {
 
           /// Label Medium [TextStyle] of Dark Theme
           labelMedium: TextStyle(
-              color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+              color: Colors.black, fontSize: 20, fontWeight: FontWeight.w700),
+
+          /// Label Small [TextStyle] of Dark Theme
+          labelSmall: TextStyle(
+              color: Colors.black, fontSize: 12, fontWeight: FontWeight.w600),
         ),
 
         /// Primary Swatch of Dark Theme
@@ -169,5 +183,13 @@ class AppTheme {
           hintStyle: TextStyle(color: Colors.black87),
           labelStyle: TextStyle(color: Colors.black),
         ),
+
+        /// Card Theme for Dark Theme
+        cardTheme: CardTheme(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          color: Colors.amber,
+        ),
+        dividerColor: Colors.black,
       );
 }

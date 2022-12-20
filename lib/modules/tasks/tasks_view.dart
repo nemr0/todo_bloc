@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:todo_bloc/layout/home_layout.dart';
+import 'package:todo_bloc/shared/cubit/home_cubit.dart';
 
 import '../../shared/components/task_item.dart';
 
@@ -9,17 +11,33 @@ class TasksView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
-    return tasks.isEmpty
-        ? const CircularProgressIndicator.adaptive()
-        : ListView.separated(
+    return BlocConsumer<HomeCubit, HomeState>(
+      builder: (BuildContext context, state) {
+        List<Map> newTasks = HomeCubit.get(context).newTasks;
+
+        if (state is CreateOrOpenDBState || state is LoadingDBState) {
+          return const Center(
+              child: SizedBox(
+                  height: 30,
+                  width: 30,
+                  child: CircularProgressIndicator.adaptive()));
+        }
+        if (newTasks.isEmpty) {
+          return const Center(
+            child: Text('No Available Tasks Yet.'),
+          );
+        }
+        return ListView.separated(
             itemBuilder: (context, index) => TaskItem(
-                  task: tasks[index],
+                  task: newTasks[index],
                 ),
             separatorBuilder: (context, index) => Divider(
                   indent: width * .09,
                   endIndent: width * .09,
-                  color: Colors.indigo,
                 ),
-            itemCount: tasks.length);
+            itemCount: newTasks.length);
+      },
+      listener: (BuildContext context, Object? state) {},
+    );
   }
 }

@@ -1,132 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:todo_bloc/modules/archived_tasks/archived_view.dart';
 import 'package:todo_bloc/modules/done_tasks/done_view.dart';
 import 'package:todo_bloc/modules/tasks/tasks_view.dart';
+import 'package:todo_bloc/modules/theme_fab.dart';
+import 'package:todo_bloc/shared/cubit/home_cubit.dart';
 
 import '../shared/components/custom_text_field.dart';
-
-/// Task Status enum {todo : [TaskView], done : [DoneView], archived : [ArchivedView],}
-enum TaskStatus { todo, done, archived }
-
-List<Map> tasks = [];
 
 /// Layout of Home Page includes :
 /// - [AppBar].
 /// - body (refers to [TasksView],[DoneView],[ArchivedView]).
 /// - Floating Action Button.
-class HomeLayout extends StatefulWidget {
-  const HomeLayout({
+class HomeLayout extends StatelessWidget {
+  HomeLayout({
     super.key,
   });
 
-  @override
-  State<HomeLayout> createState() => _HomeLayoutState();
-}
-
-class _HomeLayoutState extends State<HomeLayout> {
-  /// get data from tasks table
-  Future<List<Map>> getFromDB() async =>
-      await db.rawQuery('SELECT * FROM tasks');
-
-  /// on database create and open
-  /// version '1'
-  Future<Database> openDB() async => await openDatabase('todo.db',
-      version: 1,
-      onCreate: (db, i) => db.execute(
-          'CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT, time TEXT, date TEXT, status TEXT)'),
-      onOpen: (db) async {
-        db.query('tasks').then((value) => print(value));
-      });
-
-  /// inserting task to db
-  Future<int?> insertToDB(String title, String time, String date,
-          {TaskStatus? status}) async =>
-      await db.insert('tasks', {
-        'title': title,
-        'time': time,
-        'date': date,
-        'status':
-            status == null ? TaskStatus.todo.toString() : status.toString()
-      });
-
-  /// [BottomNavigationBar] currentIndex
-  int _index = 0;
-
-  /// refers to [TasksView],[DoneView],[ArchivedView]
-  final List<Widget> bodyWidgets = const [
-    TasksView(),
-    DoneView(),
-    ArchivedView(),
-  ];
-
-  /// [AppBar] Labels
-  final List<String> labels = const [
-    'All Tasks',
-    'Done Tasks',
-    'Archived Tasks'
-  ];
-
   /// [PageController] for [PageView]
-  late PageController _bodyPageController;
-  late PageController _appBarPageController;
+  final PageController _bodyPageController = PageController();
+  final PageController _appBarPageController = PageController();
 
   /// Text Editing Controllers for Bottom Sheet
-  late TextEditingController titleController;
-  late TextEditingController timeController;
-  late TextEditingController dateController;
-  late Database db;
-
-  // overriding initState method
-  @override
-  void initState() {
-    super.initState();
-    openDB().then((value) async {
-      db = value;
-      tasks = await getFromDB();
-    });
-
-    // Initializing the body & appbar Page Controller
-    _bodyPageController = PageController();
-    _appBarPageController = PageController();
-    // Initializing Text Editing Controller for BottomSheet
-    titleController = TextEditingController();
-    timeController = TextEditingController();
-    dateController = TextEditingController();
-  }
-
-  // overriding dispose method
-  @override
-  void dispose() {
-    // Disposing the body&appbar Page Controller
-    _bodyPageController.dispose();
-    _appBarPageController.dispose();
-    // Disposing Text Editing Controller for BottomSheet
-    titleController.dispose();
-    timeController.dispose();
-    dateController.dispose();
-    super.dispose();
-  }
+  final TextEditingController titleController = TextEditingController();
+  final TextEditingController timeController = TextEditingController();
+  final TextEditingController dateController = TextEditingController();
 
   /// On [BottomNavigationBar] Icon Press or [PageView] switch in [AppBar] or
   /// body
-  void _onSwitch(int index, {bool? isAppBarOrBody}) {
-    setState(() {
-      // setting new index
-      _index = index;
-      //using this page controller you can make beautiful animation effects
-      if (isAppBarOrBody == null || isAppBarOrBody == true) {
-        _bodyPageController.animateToPage(_index,
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.bounceInOut);
-      }
-      if (isAppBarOrBody == null || isAppBarOrBody == false) {
-        _appBarPageController.animateToPage(_index,
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.bounceInOut);
-      }
-    });
-  }
+  void _onSwitch(int index, HomeCubit hc, bool? isBody) => {
+        hc.isBodySetter(isBody),
+        // setting new index
+        hc.setIndex(index),
+        hc.isBodySetter(null),
+      };
 
   /// Scaffold key to control bottomSheet and more...
   final scaffoldKey = GlobalKey<ScaffoldState>();
@@ -134,102 +41,134 @@ class _HomeLayoutState extends State<HomeLayout> {
   /// Form Key to Validate
   final formKey = GlobalKey<FormState>();
 
-  /// a flag to show if bottom nav key is active
-  bool isBottomSheetShown = false;
-  PersistentBottomSheetController? bottomSheetController;
-
   /// overriding build method for [HomeLayout]
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-        key: scaffoldKey,
-        appBar: AppBar(
-            automaticallyImplyLeading: false,
-            toolbarHeight: MediaQuery.of(context).size.height * .09,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.only(
-                bottomRight: Radius.circular(50),
-                bottomLeft: Radius.circular(50),
-              ),
-            ),
-            title: SizedBox(
-              height: 50,
-              child: PageView.builder(
-                onPageChanged: (i) => _onSwitch(i, isAppBarOrBody: true),
-                itemBuilder: (context, index) => Center(
-                  child: Text(
-                    labels[index],
-                    style: Theme.of(context).textTheme.labelLarge,
+    return BlocProvider<HomeCubit>(
+      create: (context) => HomeCubit()..createOrOpenDB(),
+      child: BlocConsumer<HomeCubit, HomeState>(
+        listener: (context, state) {
+          if (state is HomeChangeScreenState) {
+            int index = HomeCubit.get(context).index;
+            _bodyPageController.animateToPage(index,
+                duration: const Duration(milliseconds: 150),
+                curve: Curves.decelerate);
+            _appBarPageController.animateToPage(index,
+                duration: const Duration(milliseconds: 150),
+                curve: Curves.decelerate);
+          }
+        },
+        builder: (context, state) {
+          HomeCubit hc = HomeCubit.get(context);
+          return Scaffold(
+              key: scaffoldKey,
+              appBar: AppBar(
+                  automaticallyImplyLeading: false,
+                  toolbarHeight: MediaQuery.of(context).size.height * .09,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.only(
+                      bottomRight: Radius.circular(50),
+                      bottomLeft: Radius.circular(50),
+                    ),
                   ),
+                  title: SizedBox(
+                    height: 50,
+                    child: PageView.builder(
+                      onPageChanged: hc.isBody != true
+                          ? (i) => _onSwitch(i, hc, false)
+                          : null,
+                      itemBuilder: (context, index) => Center(
+                        child: Text(
+                          hc.labels[hc.index],
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                      ),
+                      itemCount: hc.bodyWidgets.length,
+                      controller: _appBarPageController,
+                    ),
+                  )),
+              body: GestureDetector(
+                onTap: () {
+                  if (hc.bottomSheetController != null) {
+                    hc.bottomSheetController?.close();
+                    hc.isBottomSheetShownSetter(false);
+                  }
+                },
+                child: PageView.builder(
+                  onPageChanged: (i) =>
+                      hc.isBody != false ? _onSwitch(i, hc, true) : null,
+                  itemBuilder: (context, index) => hc.bodyWidgets[index],
+                  itemCount: hc.bodyWidgets.length,
+                  controller: _bodyPageController,
                 ),
-                itemCount: bodyWidgets.length,
-                controller: _appBarPageController,
               ),
-            )),
-        body: GestureDetector(
-          onTap: () {
-            if (bottomSheetController != null) {
-              bottomSheetController?.close();
-              setState(() => isBottomSheetShown = false);
-            }
-          },
-          child: PageView.builder(
-            onPageChanged: (i) => _onSwitch(i, isAppBarOrBody: false),
-            itemBuilder: (context, index) => bodyWidgets[index],
-            itemCount: bodyWidgets.length,
-            controller: _bodyPageController,
-          ),
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: onFABPress,
-          tooltip: 'Increment',
-          child: Icon(isBottomSheetShown ? Icons.add : Icons.circle_outlined),
-        ),
-        bottomNavigationBar: BottomNavigationBar(
-          items: const [
-            BottomNavigationBarItem(
-                label: 'Tasks',
-                icon: Icon(
-                  Icons.menu_open_outlined,
-                )),
-            BottomNavigationBarItem(
-                label: 'Done',
-                icon: Icon(
-                  Icons.check_circle_outline_outlined,
-                )),
-            BottomNavigationBarItem(
-                label: 'Archived',
-                icon: Icon(
-                  Icons.archive_outlined,
-                )),
-          ],
-          currentIndex: _index,
-          onTap: (i) => _onSwitch(i),
-        ));
+              floatingActionButton: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const ThemeModeFAB(),
+                  const SizedBox(
+                    height: 10,
+                  ),
+                  FloatingActionButton(
+                    onPressed: () => onFABPress(context),
+                    tooltip: 'Insert Task',
+                    child: Icon(hc.isBottomSheetShown
+                        ? Icons.add
+                        : Icons.circle_outlined),
+                  ),
+                ],
+              ),
+              bottomNavigationBar: BottomNavigationBar(
+                items: const [
+                  BottomNavigationBarItem(
+                      label: 'Tasks',
+                      icon: Icon(
+                        Icons.menu_open_outlined,
+                      )),
+                  BottomNavigationBarItem(
+                      label: 'Done',
+                      icon: Icon(
+                        Icons.check_circle_outline_outlined,
+                      )),
+                  BottomNavigationBarItem(
+                      label: 'Archived',
+                      icon: Icon(
+                        Icons.archive_outlined,
+                      )),
+                ],
+                currentIndex: hc.index,
+                onTap: (i) => _onSwitch(i, hc, null),
+              ));
+        },
+      ),
+    );
   }
 
   /// ON [FloatingActionButton] Pressed
-  onFABPress() {
+  onFABPress(BuildContext context) {
     {
+      HomeCubit hc = HomeCubit.get(context);
       // If Bottom Sheet is Open
-      if (isBottomSheetShown) {
+      if (hc.isBottomSheetShown) {
         // If title, time and date are valid (not empty)
         if (formKey.currentState?.validate() == true) {
           // insert task
-          insertToDB(
+          hc.insertTaskToDB(
               titleController.text, timeController.text, dateController.text);
           titleController.text = '';
           timeController.text = '';
           dateController.text = '';
           // close Bottom Sheet
           Navigator.pop(context);
+          hc.isBottomSheetShownSetter(false);
+
           // setState(() => isBottomSheetShown = false);
         }
       }
       // if bottom sheet is closed
       else {
         // open it
-        bottomSheetController = scaffoldKey.currentState?.showBottomSheet(
+        hc.bottomSheetController = scaffoldKey.currentState?.showBottomSheet(
           (context) => Padding(
             padding: const EdgeInsets.all(20.0),
             child: SizedBox(
@@ -265,12 +204,19 @@ class _HomeLayoutState extends State<HomeLayout> {
                                 context: context,
                                 initialTime: TimeOfDay.now(),
                                 helpText: 'Please Specify The Task Time')
-                            .then((value) => setState(
-                                () => timeController.text = value == null
-                                    ? timeController.text.isEmpty
-                                        ? ''
-                                        : timeController.text
-                                    : value.format(context)));
+                            .then((value) => timeController.text = value == null
+                                ? timeController.text.isEmpty
+                                    ? ''
+                                    : timeController.text
+                                : value.format(context));
+                        // .then((value) =>
+                        // setState(
+                        //     () => timeController.text = value == null
+                        //         ? timeController.text.isEmpty
+                        //             ? ''
+                        //             : timeController.text
+                        // : value.format(context))
+                        // );
                       },
                       validator: (String? s) {
                         if (s == null || s.isEmpty) {
@@ -319,9 +265,7 @@ class _HomeLayoutState extends State<HomeLayout> {
             ),
           ),
         );
-        bottomSheetController?.closed
-            .then((value) => {setState(() => isBottomSheetShown = false)});
-        setState(() => isBottomSheetShown = true);
+        hc.isBottomSheetShownSetter(true);
       }
     }
   }
